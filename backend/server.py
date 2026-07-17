@@ -52,7 +52,6 @@ CLINICS = [
 EMERGENCY_NUMBERS = {"ambulance": "108", "national": "112"}
 
 # Triage classification tool schema (used for real Gemma function calling)
-# Added 'seeking_info' for diagnostic flow conversations
 TRIAGE_FUNCTION = {
     "name": "report_triage",
     "description": (
@@ -65,18 +64,47 @@ TRIAGE_FUNCTION = {
             "triage_tier": {
                 "type": "string",
                 "enum": ["seeking_info", "self_care", "clinic_visit", "emergency"],
-                "description": "seeking_info = need more follow-up details to decide; self_care = safe home care; clinic_visit = should see a clinic soon; emergency = life-threatening, needs immediate help.",
+                "description": (
+                    "seeking_info = you need more details before deciding; "
+                    "self_care = safe to manage at home; "
+                    "clinic_visit = should see a health worker soon, not urgent; "
+                    "emergency = life-threatening, needs immediate help."
+                ),
             },
-            "is_emergency": {"type": "boolean", "description": "True only if triage_tier is emergency."} ,
+            "is_emergency": {
+                "type": "boolean",
+                "description": "True only if triage_tier is emergency.",
+            },
             "patient_message": {
                 "type": "string",
-                "description": "A short, calm, reassuring reply or follow-up question to the patient in THEIR language. Never diagnose.",
+                "description": (
+                    "A short, calm, reassuring reply in the patient's language. "
+                    "If triage_tier is seeking_info, this MUST be a single, specific "
+                    "follow-up question (e.g. 'कब ले बुखार हे?' not a vague prompt). "
+                    "Never diagnose. Never use medical jargon."
+                ),
+            },
+            "quick_replies": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": (
+                    "ONLY when triage_tier is seeking_info: 2-4 short tappable answer "
+                    "options for the follow-up question, in the patient's language "
+                    "(e.g. ['हव, बुखार हे', 'नइ, बुखार नइहे', 'पता नइहे']). "
+                    "Leave empty array for all other tiers."
+                ),
             },
             "care_recommendation": {
                 "type": "string",
-                "description": "One concrete next-step advice or follow-up guidance in the patient's language. If triage_tier is seeking_info, guide them on what info is needed.",
+                "description": (
+                    "One concrete, specific next-step instruction in the patient's language. "
+                    "For clinic_visit/emergency, be direct about urgency and timing."
+                ),
             },
-            "reasoning": {"type": "string", "description": "Brief clinical reasoning (English, for developers)."},
+            "reasoning": {
+                "type": "string",
+                "description": "Brief clinical reasoning in English, for developers/judges only — never shown to patient.",
+            },
         },
         "required": ["triage_tier", "is_emergency", "patient_message", "care_recommendation"],
     },
@@ -85,17 +113,35 @@ TRIAGE_FUNCTION = {
 LANG_NAMES = {"cg": "Chhattisgarhi", "hi": "Hindi", "en": "English"}
 
 SYSTEM_INSTRUCTION = (
-    "You are Sanjeevani Mitra, a calm, careful health triage assistant for rural patients in "
-    "Chhattisgarh, India. You are NOT a doctor and you NEVER give a diagnosis. Your only job is to "
-    "assess urgency and guide the patient to the right level of care. Always be reassuring and simple. "
-    "Reply strictly in the language: {lang}.\n\n"
-    "DIAGNOSTIC FLOW:\n"
-    "1. If the user's description is brief, vague, or you lack key info (e.g., duration, severity, exact symptoms), "
-    "do NOT jump to a final triage recommendation. Instead, set triage_tier to 'seeking_info' and write a friendly "
-    "reply asking 1 or 2 relevant follow-up questions to clarify.\n"
-    "2. If you have sufficient context, or if the symptoms are clearly critical (e.g., chest pain, difficulty breathing, fainted), "
-    "classify them into 'self_care', 'clinic_visit', or 'emergency'.\n\n"
-    "You MUST always call the report_triage function."
+    "You are Sanjeevani Mitra, a calm rural health triage assistant in Chhattisgarh, India. "
+    "You are NOT a doctor. You NEVER diagnose a disease or name a condition. Your only job is "
+    "to figure out how urgently the patient needs care, the way a trained community health "
+    "worker would — by asking a few sharp questions before deciding, never guessing from a "
+    "single vague sentence.\n\n"
+
+    "Reply strictly in: {lang}. Keep every sentence short and plain — the patient may have "
+    "low literacy and no medical vocabulary.\n\n"
+
+    "HOW TO THINK, STEP BY STEP:\n"
+    "1. Read the patient's message. If it names clear red-flag symptoms (chest pain, can't "
+    "breathe, unconscious, seizure, heavy bleeding, snakebite with swelling/fainting, "
+    "suicidal intent) — classify as 'emergency' IMMEDIATELY. Do not ask more questions first; "
+    "seconds matter.\n"
+    "2. If the message is vague or missing key facts (how long? how severe? any other "
+    "symptoms? age of patient if child/elderly?) — classify as 'seeking_info' and ask ONE "
+    "specific, easy-to-answer follow-up question. Provide 2-4 short quick_replies for it "
+    "so the patient can tap instead of type.\n"
+    "3. Only after you have enough detail (duration + severity + any red flags ruled out) — "
+    "classify as 'self_care' or 'clinic_visit'.\n"
+    "4. Never ask more than one question per turn. Never repeat a question you already "
+    "asked in this conversation — check the message history first.\n"
+    "5. The patient reporting on behalf of someone else (a child, parent, neighbor) is "
+    "normal and expected in this context — treat the third person described as the patient.\n\n"
+
+    "TONE: Warm, direct, never alarming unless it truly is an emergency. Never say 'I think "
+    "you might have X' — describe urgency and next steps only, never a named condition.\n\n"
+
+    "You MUST always call the report_triage function — never reply with plain text."
 )
 
 # ---------------------------------------------------------------------------
@@ -104,9 +150,9 @@ SYSTEM_INSTRUCTION = (
 EMERGENCY_KW = [
     "chest pain", "not breathing", "can't breathe", "cannot breathe", "difficulty breathing",
     "unconscious", "seizure", "stroke", "severe bleeding", "heavy bleeding", "poison", "suicide",
-    "fainted", "blue lips", "no pulse",
+    "fainted", "blue lips", "no pulse", "snake", "snakebite", "snake bite", "snaap", "saap", "snap",
     "सांस नहीं", "साँस नहीं", "बेहोश", "सीने में दर्द", "छाती में दर्द", "बहुत खून", "दौरा", "लकवा",
-    "जहर", "आत्महत्या", "खून बह",
+    "जहर", "आत्महत्या", "खून बह", "सांप", "साँप", "काट लिया", "सांप काट"
 ]
 CLINIC_KW = [
     "high fever", "fever for", "vomiting", "persistent", "injury", "fracture", "cut", "burn",
@@ -312,11 +358,13 @@ async def chat(body: ChatRequest):
     is_emergency = bool(result.get("is_emergency", tier == "emergency"))
     include_clinics = tier in ("clinic_visit", "emergency")
     latency_ms = int((time.time() - started) * 1000)
+    qreplies = result.get("quick_replies", [])
 
     response = {
         "session_id": session_id,
         "message": result.get("patient_message", ""),
         "triage_tier": tier,
+        "quick_replies": qreplies,
         "care_recommendation": result.get("care_recommendation", ""),
         "is_emergency": is_emergency,
         "clinics": CLINICS if include_clinics else [],
@@ -337,6 +385,7 @@ async def chat(body: ChatRequest):
         "text": response["message"], "language": body.language, "created_at": now_iso(),
         "triage": {
             "triage_tier": tier, "is_emergency": is_emergency,
+            "quick_replies": qreplies,
             "care_recommendation": response["care_recommendation"],
             "clinics": response["clinics"], "emergency_numbers": response["emergency_numbers"],
             "meta": response["meta"],
@@ -351,7 +400,7 @@ app.include_router(api_router)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
+    allow_credentials=False,
     allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
     allow_methods=["*"],
     allow_headers=["*"],

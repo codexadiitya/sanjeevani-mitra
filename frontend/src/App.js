@@ -363,13 +363,8 @@ function App() {
     }
   };
 
-  // Send message handler
-  const handleSendMessage = async (e) => {
-    if (e) e.preventDefault();
-    if (!inputText.trim() || loading) return;
-
-    const userMsg = inputText.trim();
-    setInputText("");
+  const sendChatMessage = async (userMsg) => {
+    if (!userMsg.trim() || loading) return;
     setLoading(true);
 
     // Optimistically update local message state (before API returns)
@@ -408,6 +403,7 @@ function App() {
               triage: {
                 triage_tier: res.data.triage_tier,
                 is_emergency: res.data.is_emergency,
+                quick_replies: res.data.quick_replies || [],
                 care_recommendation: res.data.care_recommendation,
                 clinics: res.data.clinics,
                 emergency_numbers: res.data.emergency_numbers,
@@ -445,6 +441,19 @@ function App() {
     } finally {
       setLoading(false);
     }
+  };
+
+  // Send message handler
+  const handleSendMessage = (e) => {
+    if (e) e.preventDefault();
+    if (!inputText.trim() || loading) return;
+    const msg = inputText.trim();
+    setInputText("");
+    sendChatMessage(msg);
+  };
+
+  const handleQuickReplyClick = (replyText) => {
+    sendChatMessage(replyText);
   };
 
   // Render triage status cards
@@ -734,6 +743,21 @@ function App() {
               >
                 <p>{msg.text}</p>
                 {!isUser && msg.triage && renderTriageCard(msg.triage)}
+
+                {/* Generated Quick Replies for seeking_info turns */}
+                {!isUser && msg.triage && msg.triage.triage_tier === "seeking_info" && msg.triage.quick_replies && msg.triage.quick_replies.length > 0 && idx === messages.length - 1 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {msg.triage.quick_replies.map((reply, ridx) => (
+                      <button
+                        key={ridx}
+                        onClick={() => handleQuickReplyClick(reply)}
+                        className="bg-blue-50 border border-blue-200 text-blue-800 text-sm font-semibold px-3 py-1.5 rounded-full hover:bg-blue-100 transition-colors active:scale-95"
+                      >
+                        {reply}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             );
           })}
