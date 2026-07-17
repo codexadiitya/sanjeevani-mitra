@@ -774,7 +774,7 @@ function App() {
         </div>
 
         {/* Developer Metadata Side Panel Overlay */}
-        {isDevOpen && devMeta && (
+        {isDevOpen && (
           <div
             data-testid="dev-panel"
             className="absolute right-0 top-0 w-[80%] h-full bg-stone-900/95 border-l border-stone-700 text-stone-200 z-30 p-4 font-mono text-xs overflow-y-auto sm-snap"
@@ -785,42 +785,48 @@ function App() {
                 <X className="w-4 h-4" />
               </button>
             </div>
-            <div className="space-y-3">
-              <div>
-                <span className="text-stone-400 font-bold block">MODEL USED:</span>
-                <span className="text-emerald-400 text-sm font-semibold">{devMeta.model_used}</span>
-              </div>
-              <div>
-                <span className="text-stone-400 font-bold block">FALLBACK TRIGGERED:</span>
-                <span className={devMeta.fallback_triggered ? "text-red-400" : "text-emerald-400"}>
-                  {String(devMeta.fallback_triggered)}
-                </span>
-              </div>
-              {devMeta.fallback_triggered && (
+            {devMeta ? (
+              <div className="space-y-3">
                 <div>
-                  <span className="text-stone-400 font-bold block">FALLBACK REASON:</span>
-                  <p className="text-red-400 italic bg-stone-950 p-2 rounded mt-1 break-words">
-                    {devMeta.fallback_reason}
+                  <span className="text-stone-400 font-bold block">MODEL USED:</span>
+                  <span className="text-emerald-400 text-sm font-semibold">{devMeta.model_used}</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 font-bold block">FALLBACK TRIGGERED:</span>
+                  <span className={devMeta.fallback_triggered ? "text-red-400" : "text-emerald-400"}>
+                    {String(devMeta.fallback_triggered)}
+                  </span>
+                </div>
+                {devMeta.fallback_triggered && (
+                  <div>
+                    <span className="text-stone-400 font-bold block">FALLBACK REASON:</span>
+                    <p className="text-red-400 italic bg-stone-950 p-2 rounded mt-1 break-words">
+                      {devMeta.fallback_reason}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <span className="text-stone-400 font-bold block">LATENCY:</span>
+                  <span className="text-blue-400 font-semibold">{devMeta.latency_ms} ms</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 font-bold block">CLINICAL REASONING:</span>
+                  <p className="bg-stone-950 p-2 rounded mt-1 border border-stone-800 leading-relaxed text-stone-300 break-words">
+                    {devMeta.reasoning || "N/A"}
                   </p>
                 </div>
-              )}
-              <div>
-                <span className="text-stone-400 font-bold block">LATENCY:</span>
-                <span className="text-blue-400 font-semibold">{devMeta.latency_ms} ms</span>
+                <div>
+                  <span className="text-stone-400 font-bold block">LIVE LLM CALLS:</span>
+                  <span className={devMeta.live_model ? "text-emerald-400" : "text-amber-400"}>
+                    {devMeta.live_model ? "Connected to GenAI" : "Offline / Keyword Engine"}
+                  </span>
+                </div>
               </div>
-              <div>
-                <span className="text-stone-400 font-bold block">CLINICAL REASONING:</span>
-                <p className="bg-stone-950 p-2 rounded mt-1 border border-stone-800 leading-relaxed text-stone-300 break-words">
-                  {devMeta.reasoning || "N/A"}
-                </p>
+            ) : (
+              <div className="text-stone-400 italic text-center py-12 leading-relaxed">
+                No active triage analysis. Send a symptom description to inspect Gemma's live reasoning and latency logs.
               </div>
-              <div>
-                <span className="text-stone-400 font-bold block">LIVE LLM CALLS:</span>
-                <span className={devMeta.live_model ? "text-emerald-400" : "text-amber-400"}>
-                  {devMeta.live_model ? "Connected to GenAI" : "Offline / Keyword Engine"}
-                </span>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
