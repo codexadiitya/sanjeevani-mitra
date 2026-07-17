@@ -1,0 +1,40 @@
+@import url('https://fonts.googleapis.com/css2?family=Mukta:wght@300;400;500;600;700;800&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+    -webkit-text-size-adjust: 100%;
+}
+
+body {
+    margin: 0;
+    background-color: #FDFBF7;
+    color: #1C1917;
+    font-family: 'Mukta', 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Calm, functional motion only */
+@keyframes sm-fade-in {
+    from { opacity: 0; transform: translateY(6px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+.sm-fade-in { animation: sm-fade-in 0.22s ease-out both; }
+
+@keyframes sm-snap {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+.sm-snap { animation: sm-snap 0.08s linear both; }
+
+@keyframes sm-pulse-ring {
+    0% { box-shadow: 0 0 0 0 rgba(255,255,255,0.55); }
+    70% { box-shadow: 0 0 0 16px rgba(255,255,255,0); }
+    100% { box-shadow: 0 0 0 0 rgba(255,255,255,0); }
+}
+.sm-pulse { animation: sm-pulse-ring 1.6s infinite; }
+
+.pb-safe { padding-bottom: calc(env(safe-area-inset-bottom) + 1rem); }
