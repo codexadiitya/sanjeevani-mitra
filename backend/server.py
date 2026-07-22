@@ -438,6 +438,12 @@ async def ensure_session(session_id: Optional[str], language: str) -> str:
 # ---------------------------------------------------------------------------
 # Routes
 # ---------------------------------------------------------------------------
+@app.get("/")
+@app.head("/")
+async def root_health():
+    return {"message": "Sanjeevani Mitra API", "status": "online", "live_model": has_real_key()}
+
+
 @api_router.get("/")
 async def root():
     return {"message": "Sanjeevani Mitra API", "live_model": has_real_key()}
