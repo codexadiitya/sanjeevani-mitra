@@ -337,7 +337,7 @@ async def model_classify(history: list[dict], lang: str) -> dict:
         logger.warning("Gemma call failed (%s). Falling back to %s", e, GEMINI_FALLBACK_MODEL)
         args = await call(GEMINI_FALLBACK_MODEL)
         if not args:
-            raise HTTPException(status_code=502, detail="Both Gemma and Gemini failed to classify")
+            raise RuntimeError("Both Gemma and Gemini failed to classify")
         return {**args, "model_used": GEMINI_FALLBACK_MODEL, "fallback_triggered": True, "fallback_reason": str(e)}
 
 
@@ -424,11 +424,9 @@ async def chat(body: ChatRequest):
     if has_real_key():
         try:
             result = await model_classify(history, body.language)
-        except HTTPException:
-            raise
         except Exception as e:  # noqa: BLE001
-            logger.error("Model classify unexpected error: %s", e)
-            result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": False}
+            logger.error("Model classify error (%s), falling back to mock engine", e)
+            result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": True, "fallback_reason": str(e)}
     else:
         result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": False}
 
