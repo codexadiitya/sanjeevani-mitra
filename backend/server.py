@@ -53,22 +53,76 @@ class InMemCursor:
         return self.items[:length]
 
 
+class SafeCollection:
+    def __init__(self, real_coll, name):
+        self.real_coll = real_coll
+        self.in_mem = InMemCollection(name)
+
+    async def find_one(self, filter_dict=None, *args, **kwargs):
+        if self.real_coll is not None:
+            try:
+                return await self.real_coll.find_one(filter_dict, *args, **kwargs)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("DB find_one error (%s), falling back to in-memory store", e)
+        return await self.in_mem.find_one(filter_dict)
+
+    async def insert_one(self, doc, *args, **kwargs):
+        if self.real_coll is not None:
+            try:
+                return await self.real_coll.insert_one(doc, *args, **kwargs)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("DB insert_one error (%s), falling back to in-memory store", e)
+        return await self.in_mem.insert_one(doc)
+
+    def find(self, filter_dict=None, projection=None, *args, **kwargs):
+        if self.real_coll is not None:
+            try:
+                return SafeCursor(self.real_coll.find(filter_dict, projection, *args, **kwargs), self.in_mem.find(filter_dict))
+            except Exception as e:  # noqa: BLE001
+                logger.warning("DB find error (%s), falling back to in-memory store", e)
+        return self.in_mem.find(filter_dict)
+
+
+class SafeCursor:
+    def __init__(self, real_cursor, fallback_cursor):
+        self.real_cursor = real_cursor
+        self.fallback_cursor = fallback_cursor
+
+    def sort(self, key, direction=1):
+        if self.real_cursor is not None:
+            try:
+                self.real_cursor = self.real_cursor.sort(key, direction)
+            except Exception:  # noqa: BLE001
+                pass
+        self.fallback_cursor = self.fallback_cursor.sort(key, direction)
+        return self
+
+    async def to_list(self, length=100):
+        if self.real_cursor is not None:
+            try:
+                return await self.real_cursor.to_list(length)
+            except Exception as e:  # noqa: BLE001
+                logger.warning("DB to_list error (%s), falling back to in-memory store", e)
+        return await self.fallback_cursor.to_list(length)
+
+
 class SafeDB:
     def __init__(self, real_db):
         self.real_db = real_db
-        self.in_mem = {"sessions": InMemCollection("sessions"), "messages": InMemCollection("messages")}
+        self.collections = {}
 
     def __getattr__(self, name):
-        if self.real_db is not None:
-            return getattr(self.real_db, name)
-        return self.in_mem.setdefault(name, InMemCollection(name))
+        if name not in self.collections:
+            real_coll = getattr(self.real_db, name) if self.real_db is not None else None
+            self.collections[name] = SafeCollection(real_coll, name)
+        return self.collections[name]
 
 
 mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
 db_name = os.environ.get('DB_NAME', 'sanjeevani_db')
 
 try:
-    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=2000)
+    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=2500)
     raw_db = client[db_name]
 except Exception as e:  # noqa: BLE001
     raw_db = None
