@@ -14,10 +14,66 @@ from datetime import datetime, timezone
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection with safe in-memory fallback
+class InMemCollection:
+    def __init__(self, name):
+        self.name = name
+        self.data = []
+
+    async def find_one(self, filter_dict):
+        for item in self.data:
+            if all(item.get(k) == v for k, v in (filter_dict or {}).items()):
+                return item
+        return None
+
+    async def insert_one(self, doc):
+        self.data.append(dict(doc))
+        return True
+
+    def find(self, filter_dict=None, projection=None):
+        filter_dict = filter_dict or {}
+        matched = [
+            {k: v for k, v in item.items() if k != "_id"}
+            for item in self.data
+            if all(item.get(k) == v for k, v in filter_dict.items())
+        ]
+        return InMemCursor(matched)
+
+
+class InMemCursor:
+    def __init__(self, items):
+        self.items = items
+
+    def sort(self, key, direction=1):
+        reverse = direction == -1
+        self.items = sorted(self.items, key=lambda x: x.get(key, ""), reverse=reverse)
+        return self
+
+    async def to_list(self, length=100):
+        return self.items[:length]
+
+
+class SafeDB:
+    def __init__(self, real_db):
+        self.real_db = real_db
+        self.in_mem = {"sessions": InMemCollection("sessions"), "messages": InMemCollection("messages")}
+
+    def __getattr__(self, name):
+        if self.real_db is not None:
+            return getattr(self.real_db, name)
+        return self.in_mem.setdefault(name, InMemCollection(name))
+
+
+mongo_url = os.environ.get('MONGO_URL', 'mongodb://localhost:27017')
+db_name = os.environ.get('DB_NAME', 'sanjeevani_db')
+
+try:
+    client = AsyncIOMotorClient(mongo_url, serverSelectionTimeoutMS=2000)
+    raw_db = client[db_name]
+except Exception as e:  # noqa: BLE001
+    raw_db = None
+
+db = SafeDB(raw_db)
 
 app = FastAPI(title="Sanjeevani Mitra API")
 api_router = APIRouter(prefix="/api")
