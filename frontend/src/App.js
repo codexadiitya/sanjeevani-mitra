@@ -506,25 +506,32 @@ function App() {
               </h4>
               <div className="space-y-2">
                 {displayClinics.map((clinic, idx) => (
-                  <div key={idx} className="bg-white/60 p-2.5 rounded border border-current/10 text-stone-900 text-sm">
-                    <div className="font-bold flex items-center justify-between">
-                      <span>{clinic.name}</span>
-                      <span className="text-xs bg-stone-200 text-stone-800 px-1.5 py-0.5 rounded">
-                        {clinic.type}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-3 text-stone-600 mt-1 text-xs flex-wrap">
-                      {clinic.distance_km && (
-                        <span className="flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5" />
-                          {text.distance.replace("{dist}", clinic.distance_km)}
+                  <div key={idx} className="bg-white/80 p-3 rounded-lg border border-current/15 text-stone-900 text-sm shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <div className="font-bold flex items-center gap-2">
+                        <span>{clinic.name}</span>
+                        <span className="text-xs bg-stone-100 text-stone-700 px-2 py-0.5 rounded border border-stone-200">
+                          {clinic.type}
                         </span>
-                      )}
-                      <a href={`tel:${clinic.phone}`} className="flex items-center gap-1 text-blue-700 font-semibold underline">
-                        <Phone className="w-3.5 h-3.5" />
-                        {clinic.phone}
-                      </a>
+                      </div>
+                      <div className="flex items-center gap-3 text-stone-600 mt-1 text-xs">
+                        {clinic.distance_km && (
+                          <span className="flex items-center gap-1">
+                            <MapPin className="w-3.5 h-3.5 text-stone-500" />
+                            {text.distance.replace("{dist}", clinic.distance_km)}
+                          </span>
+                        )}
+                      </div>
                     </div>
+                    {clinic.phone && (
+                      <a
+                        href={`tel:${clinic.phone}`}
+                        className="inline-flex items-center justify-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs px-3.5 py-2 rounded-md shadow transition-colors"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        <span>Call Now ({clinic.phone})</span>
+                      </a>
+                    )}
                   </div>
                 ))}
               </div>
