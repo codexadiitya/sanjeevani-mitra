@@ -539,4 +539,8 @@ app.add_middleware(
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
-    client.close()
+    try:
+        if 'client' in globals() and client:
+            client.close()
+    except Exception:  # noqa: BLE001
+        pass
