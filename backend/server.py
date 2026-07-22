@@ -373,8 +373,18 @@ async def model_classify(history: list[dict], lang: str) -> dict:
         for cand in getattr(resp, "candidates", []) or []:
             for part in getattr(cand.content, "parts", []) or []:
                 fc = getattr(part, "function_call", None)
-                if fc and fc.name == "report_triage":
-                    return dict(fc.args)
+                if fc and getattr(fc, "name", None) == "report_triage":
+                    args = getattr(fc, "args", {})
+                    if isinstance(args, dict):
+                        return args
+                    try:
+                        return dict(args)
+                    except Exception:  # noqa: BLE001
+                        try:
+                            from google.protobuf.json_format import MessageToDict
+                            return MessageToDict(args)
+                        except Exception:  # noqa: BLE001
+                            pass
         return None
 
     async def call(model_name: str) -> Optional[dict]:
