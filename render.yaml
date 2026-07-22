@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: sanjeevani-backend
+    env: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m uvicorn server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URL
+        sync: false
+      - key: DB_NAME
+        value: sanjeevani_db
+      - key: CORS_ORIGINS
+        value: "*"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMMA_MODEL
+        value: gemma-4-31b-it
+      - key: GEMINI_FALLBACK_MODEL
+        value: gemini-2.5-flash
