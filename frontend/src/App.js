@@ -237,15 +237,16 @@ function App() {
       }
     };
 
+    const savedUser = JSON.parse(localStorage.getItem("sm_user") || "null");
+    const activeJila = user?.jila || savedUser?.jila;
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
           queryOverpass(pos.coords.latitude, pos.coords.longitude, "gps");
         },
         () => {
-          // Geolocation failed or denied -> Try district center fallback
-          const savedUser = JSON.parse(localStorage.getItem("sm_user") || "null");
-          const activeJila = user?.jila || savedUser?.jila;
+          // Geolocation denied or timed out -> Fetch clinics for user's selected district
           if (activeJila && JILA_COORDS[activeJila]) {
             const coords = JILA_COORDS[activeJila];
             queryOverpass(coords.lat, coords.lon, "jila");
@@ -253,17 +254,13 @@ function App() {
             setLocationStatus("denied");
           }
         },
-        { timeout: 8000 }
+        { timeout: 5000 }
       );
+    } else if (activeJila && JILA_COORDS[activeJila]) {
+      const coords = JILA_COORDS[activeJila];
+      queryOverpass(coords.lat, coords.lon, "jila");
     } else {
-      const savedUser = JSON.parse(localStorage.getItem("sm_user") || "null");
-      const activeJila = user?.jila || savedUser?.jila;
-      if (activeJila && JILA_COORDS[activeJila]) {
-        const coords = JILA_COORDS[activeJila];
-        queryOverpass(coords.lat, coords.lon, "jila");
-      } else {
-        setLocationStatus("denied");
-      }
+      setLocationStatus("denied");
     }
   };
 
