@@ -388,21 +388,39 @@ async def model_classify(history: list[dict], lang: str) -> dict:
         return None
 
     async def call(model_name: str) -> Optional[dict]:
-        resp = await gclient.aio.models.generate_content(model=model_name, contents=contents, config=config)
-        return extract(resp)
+        try:
+            logger.info("Executing LLM generate_content call for model: %s", model_name)
+            resp = await gclient.aio.models.generate_content(model=model_name, contents=contents, config=config)
+            extracted = extract(resp)
+            if not extracted:
+                logger.warning("LLM call succeeded for model '%s', but extract() found no report_triage function call.", model_name)
+            return extracted
+        except Exception as err:
+            logger.error(
+                "LLM API call failed for model '%s': [%s] %s",
+                model_name,
+                type(err).__name__,
+                err,
+                exc_info=True,
+            )
+            raise
 
     # Attempt Gemma first
     try:
         args = await call(GEMMA_MODEL)
         if args:
             return {**args, "model_used": GEMMA_MODEL, "fallback_triggered": False}
-        raise ValueError("Gemma returned no function call")
+        raise ValueError(f"Gemma model '{GEMMA_MODEL}' returned no valid triage function call")
     except Exception as e:  # noqa: BLE001
-        logger.warning("Gemma call failed (%s). Falling back to %s", e, GEMINI_FALLBACK_MODEL)
-        args = await call(GEMINI_FALLBACK_MODEL)
-        if not args:
-            raise RuntimeError("Both Gemma and Gemini failed to classify")
-        return {**args, "model_used": GEMINI_FALLBACK_MODEL, "fallback_triggered": True, "fallback_reason": str(e)}
+        logger.warning("Gemma call failed ([%s] %s). Falling back to %s", type(e).__name__, e, GEMINI_FALLBACK_MODEL)
+        try:
+            args = await call(GEMINI_FALLBACK_MODEL)
+            if not args:
+                raise RuntimeError(f"Fallback model '{GEMINI_FALLBACK_MODEL}' returned no valid triage function call")
+            return {**args, "model_used": GEMINI_FALLBACK_MODEL, "fallback_triggered": True, "fallback_reason": f"[{type(e).__name__}] {e}"}
+        except Exception as fallback_err:
+            logger.error("Fallback model '%s' also failed: [%s] %s", GEMINI_FALLBACK_MODEL, type(fallback_err).__name__, fallback_err)
+            raise
 
 
 # ---------------------------------------------------------------------------
@@ -495,8 +513,8 @@ async def chat(body: ChatRequest):
         try:
             result = await model_classify(history, body.language)
         except Exception as e:  # noqa: BLE001
-            logger.error("Model classify error (%s), falling back to mock engine", e)
-            result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": True, "fallback_reason": str(e)}
+            logger.error("Model classify error ([%s] %s), falling back to mock engine", type(e).__name__, e, exc_info=True)
+            result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": True, "fallback_reason": f"[{type(e).__name__}] {e}"}
     else:
         result = {**mock_classify(body.message, body.language), "model_used": "mock", "fallback_triggered": False}
 
@@ -544,10 +562,22 @@ async def chat(body: ChatRequest):
 
 app.include_router(api_router)
 
+# Explicit & safe CORS middleware configuration
+raw_cors = os.environ.get('CORS_ORIGINS', '*')
+cors_origins = [origin.strip() for origin in raw_cors.split(',') if origin.strip()]
+
+if "*" in cors_origins or not cors_origins:
+    cors_origins = ["*"]
+    allow_credentials = False
+else:
+    allow_credentials = True
+
+logger.info("Configured CORS Middleware — Allowed Origins: %s | Allow Credentials: %s", cors_origins, allow_credentials)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=False,
-    allow_origins=os.environ.get('CORS_ORIGINS', '*').split(','),
+    allow_credentials=allow_credentials,
+    allow_origins=cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

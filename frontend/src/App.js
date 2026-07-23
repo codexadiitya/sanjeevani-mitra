@@ -17,6 +17,7 @@ import "./App.css";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 const API = `${BACKEND_URL}/api`;
+console.log("[Config] REACT_APP_BACKEND_URL:", process.env.REACT_APP_BACKEND_URL || "(empty, using relative path)", "| Resolved API Endpoint:", API);
 
 const CHHATTISGARH_JILAS = [
   "Raipur", "Bilaspur", "Durg", "Rajnandgaon", "Korba", "Raigarh", "Jashpur",
@@ -302,19 +303,23 @@ function App() {
   // Fetch all sessions from backend
   const fetchSessions = async () => {
     try {
-      const res = await axios.get(`${API}/sessions`);
+      const targetUrl = `${API}/sessions`;
+      console.log("[API Call] Requesting URL (GET):", targetUrl);
+      const res = await axios.get(targetUrl);
       if (res.data && res.data.sessions) {
         setSessions(res.data.sessions);
       }
     } catch (e) {
-      console.error("Error fetching sessions:", e);
+      console.error("[API Error] fetchSessions failed:", e);
     }
   };
 
   // Start new session
   const startNewSession = async () => {
     try {
-      const res = await axios.post(`${API}/sessions`, { language });
+      const targetUrl = `${API}/sessions`;
+      console.log("[API Call] Requesting URL (POST):", targetUrl);
+      const res = await axios.post(targetUrl, { language });
       if (res.data && res.data.session_id) {
         const newId = res.data.session_id;
         setSessionId(newId);
@@ -324,7 +329,7 @@ function App() {
         fetchSessions();
       }
     } catch (e) {
-      console.error("Error creating session:", e);
+      console.error("[API Error] startNewSession failed:", e);
     }
   };
 
@@ -332,7 +337,9 @@ function App() {
   const loadSession = async (sid) => {
     try {
       setLoading(true);
-      const res = await axios.get(`${API}/sessions/${sid}/messages`);
+      const targetUrl = `${API}/sessions/${sid}/messages`;
+      console.log("[API Call] Requesting URL (GET):", targetUrl);
+      const res = await axios.get(targetUrl);
       if (res.data && res.data.messages) {
         setSessionId(sid);
         setMessages(res.data.messages);
@@ -354,7 +361,7 @@ function App() {
         setIsHistoryOpen(false);
       }
     } catch (e) {
-      console.error("Error loading session:", e);
+      console.error("[API Error] loadSession failed:", e);
     } finally {
       setLoading(false);
     }
@@ -373,8 +380,15 @@ function App() {
     };
     setMessages(prev => [...prev, tempUserMsg]);
 
+    const targetUrl = `${API}/chat`;
+    console.log("[API Call] Requesting URL (POST):", targetUrl, {
+      message: userMsg,
+      language,
+      session_id: sessionId
+    });
+
     try {
-      const res = await axios.post(`${API}/chat`, {
+      const res = await axios.post(targetUrl, {
         message: userMsg,
         language,
         session_id: sessionId
@@ -424,14 +438,32 @@ function App() {
         fetchSessions();
       }
     } catch (error) {
-      console.error("Chat API error:", error);
-      // Fallback display if server fails
+      console.error("[API Error] Full chat request failure:", error);
+      let errorDetail = "";
+
+      if (error.response) {
+        // Non-2xx HTTP response received from server
+        const status = error.response.status;
+        const dataStr = typeof error.response.data === "object" ? JSON.stringify(error.response.data) : error.response.data;
+        errorDetail = `[HTTP Error ${status}: ${dataStr || error.response.statusText}]`;
+        console.error(`[API Error Detail] Non-2xx Response (HTTP ${status}):`, error.response.data);
+      } else if (error.request) {
+        // Request created but no response received (Network failure / CORS blocked)
+        errorDetail = `[Network / CORS Error: Cannot reach backend at ${targetUrl}. Verify CORS_ORIGINS on backend and backend availability]`;
+        console.error("[API Error Detail] Network / CORS Failure (No response received):", error.request);
+      } else {
+        // Request setup error
+        errorDetail = `[Client Request Error: ${error.message}]`;
+        console.error("[API Error Detail] Request setup error:", error.message);
+      }
+
+      // Display detailed error in UI for live debugging
       setMessages(prev => [
         ...prev,
         {
           id: Math.random().toString(),
           role: "assistant",
-          text: text.error,
+          text: `${text.error} ${errorDetail}`,
           language
         }
       ]);
