@@ -19,6 +19,10 @@ const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "";
 const API = `${BACKEND_URL}/api`;
 console.log("[Config] REACT_APP_BACKEND_URL:", process.env.REACT_APP_BACKEND_URL || "(empty, using relative path)", "| Resolved API Endpoint:", API);
 
+if (!BACKEND_URL) {
+  console.error("[CRITICAL CONFIG ERROR] REACT_APP_BACKEND_URL is not set — API calls will fail!");
+}
+
 const CHHATTISGARH_JILAS = [
   "Raipur", "Bilaspur", "Durg", "Rajnandgaon", "Korba", "Raigarh", "Jashpur",
   "Sarguja", "Koriya", "Balrampur", "Surajpur", "Kabirdham", "Bemetara",
@@ -658,6 +662,16 @@ function App() {
           </form>
         </div>
       )}
+      {/* Backend Unconfigured Warning Banner */}
+      {!BACKEND_URL && (
+        <div
+          data-testid="backend-warning-banner"
+          className="bg-red-600 text-white font-bold py-2.5 px-4 text-center text-sm sticky top-0 z-50 shadow-md flex items-center justify-center gap-2 border-b border-red-700"
+        >
+          <span>⚠️ Backend Not Configured: REACT_APP_BACKEND_URL is missing in environment variables. API calls will fail.</span>
+        </div>
+      )}
+
       {/* Sticky Disclaimer Bar */}
       <div
         id="disclaimer-bar"

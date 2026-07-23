@@ -467,6 +467,11 @@ async def root():
     return {"message": "Sanjeevani Mitra API", "live_model": has_real_key()}
 
 
+@api_router.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+
 @api_router.get("/clinics")
 async def get_clinics():
     return {"clinics": CLINICS, "emergency_numbers": EMERGENCY_NUMBERS}
